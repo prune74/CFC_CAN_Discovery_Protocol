@@ -4,7 +4,11 @@ Bibliothèque commune du bus CAN de découverte entre ERM (S), HUB (H), DISTRIB 
 
 ## État
 
-Version de départ `0.1.0`. Le contrat 11 bits, les types, les opcodes retenus, le relais de télémétrie et les temporisations validées sont regroupés ici. Les points encore marqués « à trancher » dans la spécification ne sont pas des garanties de compatibilité de production. La version `1.0.0` sera publiée après fermeture de ces points et migration coordonnée des firmwares.
+Version de travail `0.2.0`. La spécification v1 fixe le contrat CAN 11 bits,
+les types, les opcodes, les délais de présence, le relais de télémétrie et le
+repérage TOR des emplacements en Exploration. La migration coordonnée des
+firmwares et leur validation restent à effectuer avant une publication stable
+`1.0.0`.
 
 ## Utilisation PlatformIO
 
@@ -12,14 +16,16 @@ Dans `platformio.ini`, épingler une version Git explicite, par exemple :
 
 ```ini
 lib_deps =
-    https://github.com/prune74/CFC_CAN_Discovery_Protocol.git#v0.1.0
+https://github.com/prune74/CFC_CAN_Discovery_Protocol.git#v0.2.0
 ```
 
 Ne pas utiliser une branche flottante pour les firmwares destinés à être déployés.
 
 ## API
 
-`src/CfcDiscoveryProtocol.h` fournit les valeurs communes, les codes de types, les opcodes, les temporisations et les fonctions de conversion/validation des CAN ID d’arbitrage.
+`src/CfcDiscoveryProtocol.h` fournit les valeurs communes, les codes de types,
+les opcodes, les temporisations, les fonctions de conversion/validation des
+CAN ID d’arbitrage et le CRC-8 du repérage D→H.
 
 ## Documentation et exemples
 

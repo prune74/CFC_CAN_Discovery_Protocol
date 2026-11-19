@@ -1,13 +1,8 @@
 {
-  "name": "CFC-CAN-Discovery-Protocol",
-  "version": "0.1.0",
-  "description": "Shared discovery CAN protocol for CFC ERM, HUB, DISTRIB and DCC converter boards.",
-  "keywords": ["can", "cfc", "discovery", "platformio", "esp32"],
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/prune74/CFC_CAN_Discovery_Protocol.git"
-  },
-  "frameworks": "arduino",
-  "platforms": "espressif32",
-  "headers": "CfcDiscoveryProtocol.h"
+  "name": "CFC_CAN_Discovery_Protocol",
+  "version": "0.2.0",
+  "description": "CAN discovery and supervision protocol shared by CFC DCC distribution boards",
+  "keywords": ["can", "discovery", "dcc", "cfc"],
+  "frameworks": ["arduino"],
+  "platforms": ["espressif32"]
 }

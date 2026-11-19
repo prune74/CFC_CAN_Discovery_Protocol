@@ -3,7 +3,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
-// Valeurs partagées du CAN de découverte CFC, version de départ 0.1.0.
+// Valeurs partagées du CAN de découverte CFC, version 0.2.0.
 // Les CAN ID des segments DCC locaux ne sont pas définis par cette bibliothèque.
 namespace cfc {
 namespace discovery {
@@ -27,6 +27,22 @@ static constexpr uint32_t NODE_LOSS_TIMEOUT_MS = 1500;
 static constexpr uint32_t DISCOVERY_RESPONSE_TIMEOUT_MS = 500;
 static constexpr uint32_t ANNOUNCE_FRAGMENT_TIMEOUT_MS = 500;
 static constexpr uint32_t ABSENCE_INTERVENTION_MS = 600000;
+static constexpr uint32_t NODE_HELLO_PERIOD_MS = 500;
+static constexpr uint8_t ASSIGN_MAX_ATTEMPTS = 3;
+static constexpr uint32_t ASSIGN_RETRY_PERIOD_MS = 250;
+
+// Repérage physique par les lignes TOR dédiées, uniquement en Exploration.
+// D -> H : préambule HIGH 100 ms, LOW 100 ms ; puis 56 symboles MAC+CRC8.
+// Chaque symbole est HIGH 20 ms (0) ou 40 ms (1), puis LOW 20 ms.
+static constexpr uint16_t D_LOCATOR_PREAMBLE_MS = 100;
+static constexpr uint16_t D_LOCATOR_ZERO_HIGH_MS = 20;
+static constexpr uint16_t D_LOCATOR_ONE_HIGH_MS = 40;
+static constexpr uint16_t D_LOCATOR_LOW_GAP_MS = 20;
+static constexpr uint8_t D_LOCATOR_BITS = 56;
+static constexpr uint32_t D_LOCATOR_REPEAT_MS = 10000;
+// C -> D : trois impulsions de 100 ms séparées par 100 ms LOW.
+static constexpr uint16_t C_LOCATOR_PULSE_MS = 100;
+static constexpr uint8_t C_LOCATOR_PULSE_COUNT = 3;
 
 enum class NodeType : uint8_t {
     ERM = 1,
@@ -58,6 +74,7 @@ enum class Opcode : uint8_t {
     ERROR = 0x09,
     DISCOVER_DONE = 0x0B,
     MODE_STATUS = 0x0C,
+    SLOT_REQUEST = 0x0D,
     ANNOUNCE_MAC_0 = 0x10,
     ANNOUNCE_MAC_1 = 0x11,
     ASSIGN_MAC_0 = 0x12,
@@ -157,9 +174,130 @@ inline bool decodeArbitrationId(uint16_t canId, Identity& identity) {
     return isAssignedIdentity(identity.type, identity.id);
 }
 
+inline bool isValidControlFrame(uint8_t dlc, const uint8_t* data);
+
+// Verrou local de sécurité H/D : les sorties sont autorisées seulement si un
+// HELLO S1 récent annonce l’Exploitation et qu’un RUN_PERMIT S1 récent,
+// cohérent avec la topologie, a été reçu.
+class RunPermitGuard {
+public:
+    explicit RunPermitGuard(Topology expectedTopology,
+                            bool enforceExpectedTopology = true)
+        : topology_(expectedTopology), enforceTopology_(enforceExpectedTopology) {}
+
+    bool onFrame(uint16_t canId, uint8_t dlc, const uint8_t* data,
+                 uint32_t nowMs) {
+        Identity source{};
+        if (!isValidControlFrame(dlc, data) ||
+            !decodeArbitrationId(canId, source) ||
+            source.type != NodeType::ERM || source.id != 1)
+            return false;
+
+        const uint16_t transaction = static_cast<uint16_t>(data[2]) |
+            (static_cast<uint16_t>(data[3]) << 8);
+        if (data[0] == static_cast<uint8_t>(Opcode::HELLO)) {
+            if (transaction != 0 ||
+                data[4] != static_cast<uint8_t>(NodeType::ERM) ||
+                data[5] != 1 || data[6] < static_cast<uint8_t>(Mode::EXPLORATION) ||
+                data[6] > static_cast<uint8_t>(Mode::BLOCKED) ||
+                data[7] < static_cast<uint8_t>(Topology::WITH_HUB) ||
+                data[7] > static_cast<uint8_t>(Topology::DIRECT))
+                return false;
+            const Mode newMode = static_cast<Mode>(data[6]);
+            const Topology newTopology = static_cast<Topology>(data[7]);
+            if (newMode != Mode::OPERATION ||
+                (enforceTopology_ && newTopology != topology_) ||
+                mode_ != newMode || topologyFromS_ != newTopology)
+                permitSeen_ = false;
+            mode_ = newMode;
+            topologyFromS_ = newTopology;
+            helloAtMs_ = nowMs;
+            helloSeen_ = true;
+            return true;
+        }
+
+        if (data[0] == static_cast<uint8_t>(Opcode::RUN_PERMIT)) {
+            if (transaction == 0 || !helloSeen_ ||
+                mode_ != Mode::OPERATION || topologyFromS_ !=
+                    static_cast<Topology>(data[6]) ||
+                (enforceTopology_ && topologyFromS_ != topology_) ||
+                nowMs - helloAtMs_ >= NODE_LOSS_TIMEOUT_MS ||
+                data[4] != static_cast<uint8_t>(NodeType::ERM) ||
+                data[5] != 1 ||
+                (enforceTopology_ && data[6] != static_cast<uint8_t>(topology_)) ||
+                data[7] == 0 ||
+                static_cast<uint32_t>(data[7]) * 10U > RUN_PERMIT_TTL_MS)
+                return false;
+            permitTtlMs_ = static_cast<uint32_t>(data[7]) * 10U;
+            permitAtMs_ = nowMs;
+            permitSeen_ = true;
+            return true;
+        }
+        return false;
+    }
+
+    bool allows(Topology localTopology, uint32_t nowMs) const {
+        return helloSeen_ && permitSeen_ &&
+               (!enforceTopology_ || localTopology == topology_) &&
+               mode_ == Mode::OPERATION && topologyFromS_ == localTopology &&
+               nowMs - helloAtMs_ < NODE_LOSS_TIMEOUT_MS &&
+               nowMs - permitAtMs_ < permitTtlMs_;
+    }
+
+    Mode mode() const { return mode_; }
+    Topology topology() const { return topologyFromS_; }
+    bool hasFreshHello(uint32_t nowMs) const {
+        return helloSeen_ && nowMs - helloAtMs_ < NODE_LOSS_TIMEOUT_MS;
+    }
+
+private:
+    Topology topology_;
+    bool enforceTopology_;
+    Mode mode_ = Mode::BLOCKED;
+    Topology topologyFromS_ = Topology::DIRECT;
+    uint32_t helloAtMs_ = 0;
+    uint32_t permitAtMs_ = 0;
+    uint32_t permitTtlMs_ = 0;
+    bool helloSeen_ = false;
+    bool permitSeen_ = false;
+};
+
 inline bool isValidControlFrame(uint8_t dlc, const uint8_t* data) {
     return dlc == CONTROL_DLC && data != nullptr &&
            data[1] == PROTOCOL_VERSION_MAJOR;
+}
+
+inline uint8_t locatorCrc8(const uint8_t* data, size_t length) {
+    uint8_t crc = 0;
+    if (data == nullptr) return crc;
+    for (size_t i = 0; i < length; ++i) {
+        crc ^= data[i];
+        for (uint8_t bit = 0; bit < 8; ++bit)
+            crc = (crc & 0x80U) ? static_cast<uint8_t>((crc << 1) ^ 0x07U)
+                                : static_cast<uint8_t>(crc << 1);
+    }
+    return crc;
+}
+
+inline void makeDLocatorPayload(const uint8_t mac[6], uint8_t payload[7]) {
+    if (mac == nullptr || payload == nullptr) return;
+    for (uint8_t i = 0; i < 6; ++i) payload[i] = mac[i];
+    payload[6] = locatorCrc8(mac, 6);
+}
+
+inline bool isValidDLocatorPayload(const uint8_t payload[7]) {
+    return payload != nullptr && locatorCrc8(payload, 6) == payload[6];
+}
+
+inline bool isValidSlotRequest(const uint8_t payload[4], uint8_t sourceDId) {
+    if (payload == nullptr || sourceDId < 1 || sourceDId > 8) return false;
+    const uint8_t targetType = payload[0];
+    const uint8_t localPort = payload[1];
+    const uint8_t expectedCId = payload[2];
+    return targetType == static_cast<uint8_t>(NodeType::CONVERTER) &&
+           localPort >= 1 && localPort <= 8 &&
+           expectedCId == static_cast<uint8_t>(sourceDId * 10 + localPort) &&
+           payload[3] == 0;
 }
 
 inline bool isRelayedBoosterTelemetry(uint16_t canId, uint8_t dlc,
@@ -168,8 +306,27 @@ inline bool isRelayedBoosterTelemetry(uint16_t canId, uint8_t dlc,
     Identity decoded{};
     if (dlc != TELEMETRY_B_RELAY_DLC || data == nullptr ||
         data[1] != static_cast<uint8_t>(NodeType::BOOSTER) ||
+        !isAssignedIdentity(NodeType::BOOSTER, data[0]) ||
+        data[4] > static_cast<uint8_t>(BoosterState::OFF) ||
         !decodeArbitrationId(canId, decoded) ||
         decoded.type != NodeType::CONVERTER || decoded.id != data[5])
+        return false;
+    if (source != nullptr) *source = decoded;
+    return true;
+}
+
+inline bool isDiscoveryTelemetry(uint16_t canId, uint8_t dlc,
+                                 const uint8_t* data,
+                                 Identity* source = nullptr) {
+    if (data == nullptr) return false;
+    if (dlc == TELEMETRY_B_RELAY_DLC)
+        return isRelayedBoosterTelemetry(canId, dlc, data, source);
+    if (dlc != TELEMETRY_B_LOCAL_DLC) return false;
+    Identity decoded{};
+    if (!decodeArbitrationId(canId, decoded) ||
+        decoded.type == NodeType::ERM || decoded.type == NodeType::BOOSTER ||
+        data[1] != static_cast<uint8_t>(decoded.type) ||
+        data[0] != decoded.id || data[4] > static_cast<uint8_t>(BoosterState::OFF))
         return false;
     if (source != nullptr) *source = decoded;
     return true;

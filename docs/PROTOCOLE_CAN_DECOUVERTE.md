@@ -1,8 +1,8 @@
 # Protocole CAN de découverte CFC
 
-**Statut : spécification de travail v1 ; les trames et temporisations ci-dessous
-sont retenues, sous réserve de validation finale avant publication de la
-bibliothèque commune.** Ce document fixe le contrat de communication entre
+**Statut : spécification v1 en cours d’implémentation.** Les identités,
+temporisations, sécurité d’exploitation et repérage physique ci-dessous sont
+retenus. Ce document fixe le contrat de communication entre
 l’ERM (S), le HUB (H), les DISTRIB (D) et les convertisseurs (C). Les boosters
 (B) ne participent pas à la découverte ; leur télémétrie est seulement relayée
 en lecture seule.
@@ -80,17 +80,17 @@ La formule et les exemples de ce tableau sont validés. Chaque carte attribuée
 utilise son propre CAN ID d’arbitrage sur le bus de découverte.
 
 Le CAN DCC local conserve ses IDs physiques `0x100`, `0x101` et `0x102` sans
-changement. Sur le CAN de découverte, le contenu télémétrique historiquement
-appelé format `0x102` est transmis sous le CAN ID unique de son émetteur. Le
-format de contrôle historiquement associé à `0x103` utilise lui aussi l’ID
-d’arbitrage unique du nœud. La migration doit donc modifier les filtres CAN
-de supervision, mais n’affecte pas les CAN DCC locaux.
+changement. Sur le CAN de découverte, la télémétrie des cartes H/D/C utilise
+le même format de contenu que le message DCC `0x102`, mais son CAN ID est celui
+de l’émetteur défini ci-dessus. Les trames de contrôle utilisent elles aussi
+le CAN ID d’arbitrage unique du nœud. La séparation des segments garantit que
+les filtres de supervision de découverte n’affectent pas le CAN DCC local.
 
-## 4. Format des trames de contrôle (famille historique `0x103`)
+## 4. Format des trames de contrôle
 
 Toutes les trames de contrôle utilisent le même en-tête et un DLC de 8. Leur
-CAN ID physique est celui de l’émetteur défini à la section 3 ; `0x103` désigne
-ici l’ancienne famille d’opcodes, pas un CAN ID partagé.
+CAN ID physique est celui de l’émetteur défini à la section 3. Aucun CAN ID
+partagé n’est utilisé pour les trames de contrôle.
 
 | Octet | Signification |
 |---:|---|
@@ -133,7 +133,7 @@ valide pour attribuer un ID D ou C.
 
 | Opcode | Nom | Émetteur → destinataire | Fonction |
 |---:|---|---|---|
-| `0x01` | `HELLO` | S/H/D/C → tous | Présence périodique ; charge utile `{TYPE, ID, mode, topologie}`. Pour S, période 500 ms ; période H/D/C à fixer. |
+| `0x01` | `HELLO` | S/H/D/C → tous | Présence périodique ; charge utile `{TYPE, ID, mode, topologie}`. Période 500 ms pour les cartes attribuées. |
 | `0x02` | `ANNOUNCE_BEGIN` | H/D/C → S | Premier fragment d’identité ; suivi de `0x10` et `0x11`. |
 | `0x03` | `DISCOVER_REQ` | S → H/D/C ciblé | Demande d’identification ; charge utile `{TYPE cible, ID cible, slot, flags}`. Exploration seulement. |
 | `0x04` | Réservé | — | Une réponse positive à `DISCOVER_REQ` commence directement par `ANNOUNCE_BEGIN`. |
@@ -145,6 +145,7 @@ valide pour attribuer un ID D ou C.
 | `0x0A` | Réservé | — | `HELLO` est le message de présence canonique en v1. |
 | `0x0B` | `DISCOVER_DONE` | S → tous | Fin de session de découverte validée ou annulée. |
 | `0x0C` | `MODE_STATUS` | S → tous | Mode Exploration/Exploitation et topologie avec/sans HUB. |
+| `0x0D` | `SLOT_REQUEST` | D → S | Signale le bouton C repéré sur une sortie physique du DISTRIB. Transaction 0. |
 | `0x10` | `ANNOUNCE_MAC_0` | H/D/C → S | Octets MAC 0..3 de l’annonce courante. |
 | `0x11` | `ANNOUNCE_MAC_1` | H/D/C → S | Octets MAC 4..5, révision matérielle et réservé. |
 | `0x12` | `ASSIGN_MAC_0` | S → H/D/C ciblé | Cible MAC, octets 0..3. |
@@ -161,7 +162,7 @@ Les colonnes ci-dessous décrivent `data[4]` à `data[7]` :
 
 | Message | Charge utile | Règle |
 |---|---|---|
-| `HELLO` | `{TYPE, ID, mode, topologie}` | Diffusé avec transaction 0. S émet toutes les 500 ms ; fréquence H/D/C à fixer. `mode`: 1 Exploration, 2 Exploitation, 3 bloqué. `topologie`: 1 avec HUB, 2 sans HUB. |
+| `HELLO` | `{TYPE, ID, mode, topologie}` | Diffusé avec transaction 0 toutes les 500 ms par S/H/D/C. `mode`: 1 Exploration, 2 Exploitation, 3 bloqué. `topologie`: 1 avec HUB, 2 sans HUB. |
 | `DISCOVER_REQ` | `{TYPE cible, ID cible, slot, flags}` | ID `0xFF` signifie « n’importe quelle ID de ce type » ; slot `0xFF` signifie inconnu/non applicable. La transaction doit être non nulle. |
 | `ANNOUNCE_BEGIN` | `{TYPE, ID courant, slot, identityFlags}` | Réponse à la demande avec même transaction, puis les deux fragments MAC. `identityFlags`: bit 0 identité attribuée, bits 1..7 réservés à zéro. |
 | `ASSIGN_BEGIN` | `{TYPE, ancien ID, slot, nouvel ID}` | Début d’écriture ciblée ; suivi de `ASSIGN_MAC_0/1` contenant la MAC cible exacte. |
@@ -171,6 +172,7 @@ Les colonnes ci-dessous décrivent `data[4]` à `data[7]` :
 | `ERROR` | `{TYPE source, ID source, code, détail}` | Transaction copiée depuis le message fautif, ou 0 pour erreur spontanée. |
 | `DISCOVER_DONE` | `{résultat, topologie, nombreValidé, réserve}` | résultat 0 validé, 1 annulé, 2 refusé. Les autres valeurs sont réservées à zéro. |
 | `MODE_STATUS` | `{mode, topologie, statusFlags, réserve}` | Diffusé lors d’un changement de switch ou d’état ; les bits non définis valent zéro. |
+| `SLOT_REQUEST` | `{TYPE_C, port_D, ID_C_attendu, 0}` | D émet après avoir reconnu le motif TOR d’un bouton C. Port D 1..8 ; `ID_C_attendu = ID_D × 10 + port_D`. Pas d’attribution à cette étape. |
 
 Les fragments d’identité utilisent le même numéro de transaction et le même
 type/ID/slot annoncés dans `ANNOUNCE_BEGIN`. Le fragment MAC et son en-tête
@@ -225,8 +227,8 @@ HUB et DISTRIB peuvent lire les cinq premiers octets et ignorer `data[5]`.
 
 Format commun de base, DLC 5 :
 `{ ID, TYPE, mesure1, mesure2, état }`. Pour C et D sans mesure électrique,
-les octets de mesure valent zéro. Le mapping exact de `state` pour D/C et les
-messages de présence sont à fixer pour la version 1.
+les octets de mesure valent zéro. Les états sont `0=OK`, `1=FAULT`,
+`2=OVERHEAT`, `3=OFF`, identiques au registre B.
 
 ## 6. Découverte et attribution
 
@@ -247,10 +249,36 @@ messages de présence sont à fixer pour la version 1.
 7. S valide l’ensemble de l’inventaire, écrit le JSON et vérifie SD et mémoire
    interne avant de pouvoir autoriser l’exploitation.
 
-Le convertisseur peut demander sa découverte par le bouton physique uniquement
-en mode Exploration. Le mécanisme TOR pour associer cette demande à une sortie
-D reste à définir ; tant qu’il n’est pas spécifié, aucun ID C ne peut être
-attribué à partir d’une annonce CAN seule.
+### Repérage physique avec DCC coupé
+
+Toutes les sorties DCC du HUB et du DISTRIB restent coupées pendant
+l’Exploration. La découverte utilise le CAN partagé ; les lignes TOR ne servent
+qu’à rapporter l’emplacement physique.
+
+- **D → H :** chaque DISTRIB transmet sa MAC par sa ligne TOR globale GPIO25,
+  qui arrive sur l’entrée TOR propre à sa sortie HUB. La trame physique commence
+  par HIGH 100 ms, LOW 100 ms, puis envoie les six octets MAC suivis d’un CRC-8
+  (polynôme `0x07`, initial `0`) en MSB d’abord. Un bit `0` est HIGH 20 ms,
+  LOW 20 ms ; un bit `1` est HIGH 40 ms, LOW 20 ms. Le DISTRIB répète ce message
+  toutes les 10 s tant que le dernier `HELLO` S valide indique Exploration.
+  Le HUB associe la ligne d’entrée au numéro de sortie et garde le couple
+  `{sortie, MAC}` pour les requêtes de découverte S.
+- **C → D :** un appui sur le bouton du convertisseur, permis uniquement après
+  un `HELLO` S frais en mode Exploration, émet trois impulsions HIGH de 100 ms,
+  séparées par 100 ms LOW, sur GPIO25. Le DISTRIB reconnaît le motif sur
+  l’entrée TOR correspondant à son port physique et envoie `SLOT_REQUEST` à S.
+  Une demande est traitée à la fois par DISTRIB ; des demandes simultanées sont
+  mises en file et émises successivement.
+- Le niveau TOR n’est jamais interprété comme défaut pendant l’Exploration.
+  En Exploitation, le bouton C et les deux décodeurs de repérage sont inactifs ;
+  GPIO25 reprend exclusivement son rôle d’injection de défaut.
+- Le signal TOR ne transporte pas de DCC et ne réactive aucune sortie. Après
+  réception de `SLOT_REQUEST`, S interroge le convertisseur C attendu par son
+  ID dérivé `{ID_D, port_D}` ; seul le convertisseur armé par son bouton répond
+  avec son annonce MAC. L’association est ensuite vérifiée et attribuée sur CAN.
+
+Sans HUB, l’unique DISTRIB racine a l’ID D1 et n’a pas besoin de repérage
+amont. Il transmet sa présence directement à S sur le CAN de découverte.
 
 La carte B ne participe pas à ce cycle et son ID n’est jamais attribué par S.
 
@@ -283,15 +311,15 @@ des sorties doit être mesuré et validé sur le matériel.
 
 | Paramètre | Valeur de travail | Statut |
 |---|---:|---|
-| Présence `HELLO` de S | 500 ms | Validé |
+| Présence `HELLO` de S/H/D/C | 500 ms | Validé |
 | Expiration de S côté H/D et coupure DCC | 1 500 ms sans `HELLO` valide de S ou `RUN_PERMIT` | Validé |
 | Réponse initiale à une requête de découverte | 500 ms | Validé |
 | Alerte de transaction sans réponse | 500 ms pour `DISCOVER_REQ` | Validé |
 | Intervention requise pour carte absente | 600 000 ms (10 min) | Décision retenue, configurable |
 | Renouvellement `RUN_PERMIT` | Toutes les 500 ms ; TTL 1 500 ms | Retenu avec les délais de présence S |
-| Retransmission d’attribution | 250 ms, jusqu’à 3 envois | Proposition ; à valider |
-| Délai de complétion de fragments d’annonce | 500 ms | Proposition ; à valider |
-| Découverte séquentielle d’un emplacement | 1 500 ms | Héritage du firmware existant ; à confirmer |
+| Retransmission d’attribution | 250 ms, jusqu’à 3 envois | Retenu |
+| Délai de complétion de fragments d’annonce | 500 ms | Retenu |
+| Motif C→D et repérage D→H | Selon la section « Repérage physique » | Retenu |
 
 Les temporisations de dialogue utilisent des délais monotones. Les comparaisons
 de millis doivent rester sûres au débordement. Une transaction expirée produit
@@ -319,9 +347,9 @@ Registre de codes proposé pour `ERROR` et `RUN_ACK` négatif :
 | `0x0E` | `RUN_DENIED` | Afficher le motif de refus | Maintenir sorties coupées |
 | `0x0F` | `SESSION_MISMATCH` | Ignorer réponse ancienne/hors session | Ne pas valider une réponse non corrélée |
 
-Les détails de codage du champ code, du nœud source, de la session et du texte
-de diagnostic sont à figer dans la version 1. Les erreurs ne doivent jamais
-entraîner une libération implicite du DCC.
+Les erreurs ne doivent jamais entraîner une libération implicite du DCC. Leur
+payload reprend le même en-tête version/transaction et code `{TYPE source,
+ID source, code erreur, contexte}` dans les quatre octets de charge utile.
 
 ## 10. Versionnement et compatibilité
 
@@ -336,18 +364,23 @@ entraîner une libération implicite du DCC.
 - Les versions de la bibliothèque partagée seront figées par dépendance dans
   `platformio.ini`, sans téléchargement automatique d’une version flottante.
 
-## 11. Points à trancher avant de publier v1
+## 11. Décisions retenues et validation avant version stable
 
-1. Fréquence `HELLO` de H/D/C hors S.
-2. Confirmer que le CAN ID source C et `data[5]` C suffisent pour situer un
-   relais B dans toutes les topologies.
-3. Nombre de retransmissions d’attribution.
-4. Codes d’état des cartes S/H/D/C.
-5. Transport fiable et sûr de l’inhibition et de l’autorisation RUN.
-6. Réaction détaillée à la perte de S puis à son retour.
-7. Cas où une sortie est volontairement non équipée et validation humaine
-   d’une MAC de remplacement.
-8. Détails des flags et de la révision matérielle dans les annonces.
+- `HELLO` H/D/C : 500 ms ; bail S : renouvellement 500 ms, expiration 1 500 ms.
+- Le relais B DLC 6 est associé au convertisseur par son CAN ID source et
+  `data[5]`, qui doivent porter le même ID C.
+- Attribution : trois envois au maximum, espacés de 250 ms ; fragments MAC
+  incomplets expirés après 500 ms.
+- États des télémétries : `0=OK`, `1=FAULT`, `2=OVERHEAT`, `3=OFF`.
+- Perte ou retour de S : sortie DCC inhibée à l’expiration du HELLO ou du bail ;
+  le retour de S n’autorise pas seul la reprise, un nouveau RUN_PERMIT valide
+  est requis.
+- Les sorties non équipées restent des emplacements absents dans l’inventaire.
+  Une MAC nouvelle sur un emplacement réservé est un remplacement potentiel
+  qui nécessite validation humaine ; l’ID reste lié à cet emplacement.
+- Les flags non définis des annonces valent zéro ; révision matérielle inconnue
+  vaut zéro.
 
-La version 1 ne doit être déclarée stable qu’après validation de ces points et
-publication de trames de référence testables par chaque firmware.
+La version `1.0.0` sera publiée après migration coordonnée, compilation de
+chaque firmware, revue des trames de référence et validation des temporisations
+des lignes TOR au banc.
