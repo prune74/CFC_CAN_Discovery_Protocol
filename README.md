@@ -4,7 +4,7 @@ Bibliothèque commune du bus CAN de découverte entre ERM (S), HUB (H), DISTRIB 
 
 ## État
 
-Version de travail `0.3.0`. La spécification v1 fixe le contrat CAN 11 bits,
+Version de travail `0.3.1`. La spécification v1 fixe le contrat CAN 11 bits,
 les types, les opcodes, les délais de présence, le relais de télémétrie et le
 repérage TOR des emplacements en Exploration. Elle ajoute l'identité LaBox
 distincte du HUB et les trames de référence DCC. La migration coordonnée des
@@ -17,7 +17,7 @@ Dans `platformio.ini`, épingler une version Git explicite, par exemple :
 
 ```ini
 lib_deps =
-https://github.com/prune74/CFC_CAN_Discovery_Protocol.git#v0.3.0
+https://github.com/prune74/CFC_CAN_Discovery_Protocol.git#v0.3.1
 ```
 
 Ne pas utiliser une branche flottante pour les firmwares destinés à être déployés.

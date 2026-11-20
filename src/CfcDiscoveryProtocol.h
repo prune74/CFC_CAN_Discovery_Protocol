@@ -3,7 +3,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
-// Valeurs partagées du CAN de découverte CFC, version 0.3.0.
+// Valeurs partagées du CAN de découverte CFC, version 0.3.1.
 // Les CAN ID des segments DCC locaux ne sont pas définis par cette bibliothèque.
 namespace cfc {
 namespace discovery {
@@ -52,7 +52,7 @@ enum class NodeType : uint8_t {
     DISTRIB = 3,
     CONVERTER = 4,
     BOOSTER = 5,
-    LABOX = 6
+    LABOX_NODE = 6
 };
 
 enum class Mode : uint8_t {
@@ -139,7 +139,7 @@ inline bool isAssignedIdentity(NodeType type, uint8_t id) {
     }
     case NodeType::BOOSTER:
         return id >= 1 && id <= 252;
-    case NodeType::LABOX:
+    case NodeType::LABOX_NODE:
         return id == 1;
     default:
         return false;
@@ -152,7 +152,7 @@ inline bool classCode(NodeType type, uint8_t& code) {
     case NodeType::HUB:       code = 1; return true;
     case NodeType::DISTRIB:   code = 2; return true;
     case NodeType::CONVERTER: code = 3; return true;
-    case NodeType::LABOX:     code = 4; return true;
+    case NodeType::LABOX_NODE: code = 4; return true;
     default: return false; // Les boosters n’émettent pas sur le CAN découverte.
     }
 }
@@ -185,7 +185,7 @@ inline bool decodeArbitrationId(uint16_t canId, Identity& identity) {
     case 1: identity.type = NodeType::HUB; break;
     case 2: identity.type = NodeType::DISTRIB; break;
     case 3: identity.type = NodeType::CONVERTER; break;
-    case 4: identity.type = NodeType::LABOX; break;
+    case 4: identity.type = NodeType::LABOX_NODE; break;
     default: return false;
     }
     identity.id = id;
