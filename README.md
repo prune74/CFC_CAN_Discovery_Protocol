@@ -1,12 +1,13 @@
 # CFC CAN Discovery Protocol
 
-Bibliothèque commune du bus CAN de découverte entre ERM (S), HUB (H), DISTRIB (D) et convertisseurs (C). Les boosters (B) n’y participent pas comme nœuds de découverte ; leur télémétrie peut être relayée en lecture seule par leur convertisseur.
+Bibliothèque commune du bus CAN de découverte entre ERM (S), HUB (H), DISTRIB (D), convertisseurs (C) et LaBox (L). Les boosters (B) n’y participent pas comme nœuds de découverte ; leur télémétrie peut être relayée en lecture seule par leur convertisseur.
 
 ## État
 
-Version de travail `0.2.0`. La spécification v1 fixe le contrat CAN 11 bits,
+Version de travail `0.3.0`. La spécification v1 fixe le contrat CAN 11 bits,
 les types, les opcodes, les délais de présence, le relais de télémétrie et le
-repérage TOR des emplacements en Exploration. La migration coordonnée des
+repérage TOR des emplacements en Exploration. Elle ajoute l'identité LaBox
+distincte du HUB et les trames de référence DCC. La migration coordonnée des
 firmwares et leur validation restent à effectuer avant une publication stable
 `1.0.0`.
 
@@ -16,7 +17,7 @@ Dans `platformio.ini`, épingler une version Git explicite, par exemple :
 
 ```ini
 lib_deps =
-https://github.com/prune74/CFC_CAN_Discovery_Protocol.git#v0.2.0
+https://github.com/prune74/CFC_CAN_Discovery_Protocol.git#v0.3.0
 ```
 
 Ne pas utiliser une branche flottante pour les firmwares destinés à être déployés.

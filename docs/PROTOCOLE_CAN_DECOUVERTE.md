@@ -5,7 +5,8 @@ temporisations, sécurité d’exploitation et repérage physique ci-dessous son
 retenus. Ce document fixe le contrat de communication entre
 l’ERM (S), le HUB (H), les DISTRIB (D) et les convertisseurs (C). Les boosters
 (B) ne participent pas à la découverte ; leur télémétrie est seulement relayée
-en lecture seule.
+en lecture seule. LaBox (L) est une source DCC distincte ; elle publie par
+télémétrie les paramètres numériques de référence de son générateur.
 
 La bibliothèque partagée GitHub sera l’implémentation de référence. Les
 firmwares ne devront pas recopier localement les IDs, opcodes ou fonctions de
@@ -42,7 +43,8 @@ codage.
 | 3 | D | DISTRIB | ID égal à la sortie HUB, 1..8 ; ID 1 en mode direct |
 | 4 | C | Convertisseur | `ID_D × 10 + sortie locale`, 11..88 selon l’ID D |
 | 5 | B | Booster | ID de canton 1..252 attribué par le CC ; non géré par S |
-| 0, 6..254 | — | Réservé | Invalide dans cette version |
+| 6 | L | LaBox | Unique, ID 1 |
+| 0, 7..254 | — | Réservé | Invalide dans cette version |
 | 255 | — | Non attribué | Marqueur d’absence d’identité, jamais un TYPE valide |
 
 Les IDs D et C sont attachés aux emplacements physiques. Une MAC nouvelle sur
@@ -68,6 +70,7 @@ uniquement pendant une transaction sérialisée.
 | H | 1 | `0x500 + (classe × 0x80) + ID` | H1 → `0x581` |
 | D | 2 | `0x500 + (classe × 0x80) + ID` | D1 → `0x601` |
 | C | 3 | `0x500 + (classe × 0x80) + ID` | C11 → `0x68B`, C88 → `0x6D8` |
+| L | 4 | `0x500 + (classe × 0x80) + ID` | L1 → `0x701` |
 
 Les CAN ID sont standard sur 11 bits. Un nœud sans ID attribué utilise
 temporairement l’adresse `0x7F` dans son code de classe, uniquement pour une
@@ -150,6 +153,9 @@ valide pour attribuer un ID D ou C.
 | `0x11` | `ANNOUNCE_MAC_1` | H/D/C → S | Octets MAC 4..5, révision matérielle et réservé. |
 | `0x12` | `ASSIGN_MAC_0` | S → H/D/C ciblé | Cible MAC, octets 0..3. |
 | `0x13` | `ASSIGN_MAC_1` | S → H/D/C ciblé | Cible MAC, octets 4..5, flags d’écriture et réservé. |
+| `0x20` | `LABOX_REFERENCE_STATUS` | L → S/tous | État de la sortie MAIN et disponibilité RailCom/timer. |
+| `0x21` | `LABOX_REFERENCE_TIMING` | L → S/tous | Demi-bits programmés, tick RMT et préambule MAIN. |
+| `0x22` | `LABOX_REFERENCE_CUTOUT` | L → S/tous | Paramètres RMT et séquence du timer de cutout. |
 | `0x80..0xFF` | Réservé | — | Réservé aux extensions futures. |
 
 L’ancien opcode `0x40` de battement de bus est retiré en v1. Il ne vaut ni
@@ -173,6 +179,16 @@ Les colonnes ci-dessous décrivent `data[4]` à `data[7]` :
 | `DISCOVER_DONE` | `{résultat, topologie, nombreValidé, réserve}` | résultat 0 validé, 1 annulé, 2 refusé. Les autres valeurs sont réservées à zéro. |
 | `MODE_STATUS` | `{mode, topologie, statusFlags, réserve}` | Diffusé lors d’un changement de switch ou d’état ; les bits non définis valent zéro. |
 | `SLOT_REQUEST` | `{TYPE_C, port_D, ID_C_attendu, 0}` | D émet après avoir reconnu le motif TOR d’un bouton C. Port D 1..8 ; `ID_C_attendu = ID_D × 10 + port_D`. Pas d’attribution à cette étape. |
+| `LABOX_REFERENCE_STATUS` | `{version_payload, séquence_LE16, flags, 0, 0}` | Envoyé par L1 toutes les 500 ms. Flags : bit 0 MAIN actif, bit 1 RailCom activé, bit 2 RailCom en pause, bit 3 timer cutout initialisé ; autres bits à zéro. |
+| `LABOX_REFERENCE_TIMING` | `{version_payload, séquence_LE16, demi1_us, demi0_us, tick_us, préambule_MAIN}` | Toutes les 500 ms ; demi-bits et tick reflètent les paramètres de génération configurés dans le firmware. |
+| `LABOX_REFERENCE_CUTOUT` | `{version_payload, séquence_LE16, début_RMT_us, durée2_RMT_us, période_timer_us, nombre_phases}` | Toutes les 500 ms ; décrit les paramètres programmés, pas la durée électrique mesurée du cutout. |
+
+Les trois trames de référence sont des trames standard CAN 11 bits, DLC 8,
+émises avec l'identifiant d'arbitrage L1 `0x701`. Elles partagent une séquence
+16 bits qui s'incrémente à chaque groupe. L'ERM ne considère le groupe cohérent
+que si les trois messages de même version et séquence sont reçus dans le délai
+de présence de 1500 ms. Les messages ne transportent aucun échantillon de
+fronts DCC et ne remplacent pas la mesure physique du booster.
 
 Les fragments d’identité utilisent le même numéro de transaction et le même
 type/ID/slot annoncés dans `ANNOUNCE_BEGIN`. Le fragment MAC et son en-tête
@@ -356,17 +372,17 @@ ID source, code erreur, contexte}` dans les quatre octets de charge utile.
 - La version du protocole sera explicite dans le format de contrôle final.
 - Un nœud ne doit pas accepter un `RUN_PERMIT` d’une version qu’il ne comprend
   pas.
-- Les changements des types (`S=1, H=2, D=3, C=4, B=5`), des CAN ID
+- Les changements des types (`S=1, H=2, D=3, C=4, B=5, L=6`), des CAN ID
   d’arbitrage de supervision et du relais B DLC 6 sont incompatibles avec les
   firmwares actuels qui utilisent d’autres registres et filtres.
-- Toute migration sera faite de façon coordonnée sur les firmwares S/H/D/C/B
+- Toute migration sera faite de façon coordonnée sur les firmwares S/H/D/C/B/L
   concernés, mais le firmware B conservera son attribution de canton CC.
 - Les versions de la bibliothèque partagée seront figées par dépendance dans
   `platformio.ini`, sans téléchargement automatique d’une version flottante.
 
 ## 11. Décisions retenues et validation avant version stable
 
-- `HELLO` H/D/C : 500 ms ; bail S : renouvellement 500 ms, expiration 1 500 ms.
+- `HELLO` H/D/C : 500 ms ; télémétrie de référence L : 500 ms ; bail S : renouvellement 500 ms, expiration 1 500 ms.
 - Le relais B DLC 6 est associé au convertisseur par son CAN ID source et
   `data[5]`, qui doivent porter le même ID C.
 - Attribution : trois envois au maximum, espacés de 250 ms ; fragments MAC

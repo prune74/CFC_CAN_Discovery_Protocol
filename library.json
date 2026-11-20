@@ -1,7 +1,7 @@
 {
   "name": "CFC_CAN_Discovery_Protocol",
-  "version": "0.2.0",
-  "description": "CAN discovery and supervision protocol shared by CFC DCC distribution boards",
+  "version": "0.3.0",
+  "description": "CAN discovery and supervision protocol shared by CFC DCC distribution boards and LaBox reference telemetry",
   "keywords": ["can", "discovery", "dcc", "cfc"],
   "frameworks": ["arduino"],
   "platforms": ["espressif32"]

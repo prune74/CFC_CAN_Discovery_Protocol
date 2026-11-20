@@ -3,7 +3,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
-// Valeurs partagées du CAN de découverte CFC, version 0.2.0.
+// Valeurs partagées du CAN de découverte CFC, version 0.3.0.
 // Les CAN ID des segments DCC locaux ne sont pas définis par cette bibliothèque.
 namespace cfc {
 namespace discovery {
@@ -19,6 +19,8 @@ static constexpr uint8_t SLOT_UNKNOWN = 0xFF;
 static constexpr uint8_t CONTROL_DLC = 8;
 static constexpr uint8_t TELEMETRY_B_LOCAL_DLC = 5;
 static constexpr uint8_t TELEMETRY_B_RELAY_DLC = 6;
+static constexpr uint8_t LABOX_REFERENCE_DLC = 8;
+static constexpr uint32_t LABOX_REFERENCE_PERIOD_MS = 500;
 
 static constexpr uint32_t S_HELLO_PERIOD_MS = 500;
 static constexpr uint32_t RUN_PERMIT_PERIOD_MS = 500;
@@ -49,7 +51,8 @@ enum class NodeType : uint8_t {
     HUB = 2,
     DISTRIB = 3,
     CONVERTER = 4,
-    BOOSTER = 5
+    BOOSTER = 5,
+    LABOX = 6
 };
 
 enum class Mode : uint8_t {
@@ -78,8 +81,19 @@ enum class Opcode : uint8_t {
     ANNOUNCE_MAC_0 = 0x10,
     ANNOUNCE_MAC_1 = 0x11,
     ASSIGN_MAC_0 = 0x12,
-    ASSIGN_MAC_1 = 0x13
+    ASSIGN_MAC_1 = 0x13,
+    LABOX_REFERENCE_STATUS = 0x20,
+    LABOX_REFERENCE_TIMING = 0x21,
+    LABOX_REFERENCE_CUTOUT = 0x22
 };
+
+static constexpr uint8_t LABOX_REFERENCE_FORMAT_VERSION = 1;
+static constexpr uint8_t LABOX_NODE_ID = 1;
+static constexpr uint16_t LABOX_CAN_ID = 0x701;
+static constexpr uint8_t LABOX_REFERENCE_FLAG_MAIN_ON = 0x01;
+static constexpr uint8_t LABOX_REFERENCE_FLAG_RAILCOM_ENABLED = 0x02;
+static constexpr uint8_t LABOX_REFERENCE_FLAG_RAILCOM_PAUSED = 0x04;
+static constexpr uint8_t LABOX_REFERENCE_FLAG_TIMER_READY = 0x08;
 
 enum class BoosterState : uint8_t {
     OK = 0,
@@ -125,6 +139,8 @@ inline bool isAssignedIdentity(NodeType type, uint8_t id) {
     }
     case NodeType::BOOSTER:
         return id >= 1 && id <= 252;
+    case NodeType::LABOX:
+        return id == 1;
     default:
         return false;
     }
@@ -136,6 +152,7 @@ inline bool classCode(NodeType type, uint8_t& code) {
     case NodeType::HUB:       code = 1; return true;
     case NodeType::DISTRIB:   code = 2; return true;
     case NodeType::CONVERTER: code = 3; return true;
+    case NodeType::LABOX:     code = 4; return true;
     default: return false; // Les boosters n’émettent pas sur le CAN découverte.
     }
 }
@@ -157,7 +174,7 @@ inline bool makeUnassignedArbitrationId(NodeType type, uint16_t& canId) {
 }
 
 inline bool decodeArbitrationId(uint16_t canId, Identity& identity) {
-    if (canId < CAN_ID_BASE || canId > CAN_ID_BASE + 4 * CAN_ID_CLASS_STRIDE - 1)
+    if (canId < CAN_ID_BASE || canId > CAN_ID_BASE + 5 * CAN_ID_CLASS_STRIDE - 1)
         return false;
     const uint16_t relative = canId - CAN_ID_BASE;
     const uint8_t code = static_cast<uint8_t>(relative / CAN_ID_CLASS_STRIDE);
@@ -168,6 +185,7 @@ inline bool decodeArbitrationId(uint16_t canId, Identity& identity) {
     case 1: identity.type = NodeType::HUB; break;
     case 2: identity.type = NodeType::DISTRIB; break;
     case 3: identity.type = NodeType::CONVERTER; break;
+    case 4: identity.type = NodeType::LABOX; break;
     default: return false;
     }
     identity.id = id;
