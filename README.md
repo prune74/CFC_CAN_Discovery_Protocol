@@ -1,15 +1,17 @@
 # CFC CAN Discovery Protocol
 
-Bibliothèque commune du bus CAN de découverte entre ERM (S), HUB (H), DISTRIB (D), convertisseurs (C) et LaBox (L). Les boosters (B) n’y participent pas comme nœuds de découverte ; leur télémétrie peut être relayée en lecture seule par leur convertisseur.
+> Suivi détaillé du projet CFC : dossier `Suivi/ERM_Liaison_DCC` dans l’espace de travail du projet.
+
+Bibliothèque commune des protocoles CAN CFC : découverte 11 bits entre ERM (S), HUB (H), DISTRIB (D), convertisseurs (C) et LaBox (L), plus les contrats logiques DCC/Cutout et les messages de référence/supervision 29 bits. Les boosters (B) ne participent pas comme nœuds de découverte; ils reçoivent le flux DCC sur le CAN Booster et leurs diagnostics par UART puis CAN Service.
 
 ## État
 
-Version de travail `0.3.1`. La spécification v1 fixe le contrat CAN 11 bits,
-les types, les opcodes, les délais de présence, le relais de télémétrie et le
-repérage TOR des emplacements en Exploration. Elle ajoute l'identité LaBox
-distincte du HUB et les trames de référence DCC. La migration coordonnée des
-firmwares et leur validation restent à effectuer avant une publication stable
-`1.0.0`.
+Version de travail `0.4.0`. Elle conserve la découverte CAN 11 bits v1 et
+formalise les messages du projet DCC : flux CAN Booster `0x100`, supervision et
+références CAN Service 29 bits `0xB6`–`0xBA`, et types UART `0x06`, `0x12`–`0x14`.
+Ces contrats sont publiés dans la bibliothèque; l’intégration coordonnée aux
+firmwares et les validations sur matériel restent à effectuer. La valeur réelle
+du cutout `0xB8` demeure invalide jusqu’à sa mesure à la sortie HUB LaBox.
 
 ## Utilisation PlatformIO
 
@@ -17,22 +19,28 @@ Dans `platformio.ini`, épingler une version Git explicite, par exemple :
 
 ```ini
 lib_deps =
-https://github.com/prune74/CFC_CAN_Discovery_Protocol.git#v0.3.1
+https://github.com/prune74/CFC_CAN_Discovery_Protocol.git#v0.4.0
 ```
 
 Ne pas utiliser une branche flottante pour les firmwares destinés à être déployés.
 
 ## API
 
-`src/CfcDiscoveryProtocol.h` fournit les valeurs communes, les codes de types,
-les opcodes, les temporisations, les fonctions de conversion/validation des
-CAN ID d’arbitrage et le CRC-8 du repérage D→H.
+`src/CfcDiscoveryProtocol.h` fournit les valeurs communes de découverte,
+opcodes, temporisations, validation des CAN ID d’arbitrage et CRC-8 du repérage
+D→H. `src/CfcDccProtocol.h` fixe les commandes DCC, identifiants, drapeaux,
+causes et dispositions des charges utiles CAN Booster, CAN Service et UART.
 
 ## Documentation et exemples
 
-- `docs/PROTOCOLE_CAN_DECOUVERTE.md` : spécification détaillée.
+- Spécification détaillée et état d’avancement : `Suivi/ERM_Liaison_DCC/PROTOCOLE_CAN_DECOUVERTE_SPECIFICATION.md` dans l’espace de travail du projet.
 - `examples/BasicProtocol/BasicProtocol.cpp` : exemple minimal de génération
   et décodage des IDs.
 - `examples/ReferenceFrames/` : trames de référence pour le CAN analyseur.
 
-Les CAN locaux DCC `0x100` (blocs), `0x101` (cutout) et `0x102` (télémétrie booster) restent distincts du bus de découverte. Le contrôleur CAN configure explicitement le format standard 11 bits.
+Dans la cible DCC, le CAN Booster standard 11 bits transporte uniquement le
+flux DCC et les événements cutout sous `0x100`. Les anciens IDs locaux
+`0x101`–`0x104` et les anciennes références LaBox standard 11 bits `0x701` /
+`0x20`–`0x22` ne font pas partie de la cible; ils restent dans les firmwares
+actuels jusqu’à leur migration. Le CAN Service 29 bits transporte références,
+supervision, défauts et réglages.

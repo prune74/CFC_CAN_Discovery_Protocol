@@ -3,8 +3,9 @@
 #include <stddef.h>
 #include <stdint.h>
 
-// Valeurs partagées du CAN de découverte CFC, version 0.3.1.
-// Les CAN ID des segments DCC locaux ne sont pas définis par cette bibliothèque.
+// Valeurs partagées du CAN de découverte CFC, bibliothèque 0.4.0.
+// Les contrats du flux logique DCC et du CAN Service se trouvent dans
+// CfcDccProtocol.h; ce fichier conserve la découverte standard 11 bits.
 namespace cfc {
 namespace discovery {
 
@@ -82,6 +83,8 @@ enum class Opcode : uint8_t {
     ANNOUNCE_MAC_1 = 0x11,
     ASSIGN_MAC_0 = 0x12,
     ASSIGN_MAC_1 = 0x13,
+    // Legacy v0.3.1 LaBox messages, retained only for old firmware migration.
+    // The DCC target uses 29-bit CAN Service 0xB7/0xB8 instead.
     LABOX_REFERENCE_STATUS = 0x20,
     LABOX_REFERENCE_TIMING = 0x21,
     LABOX_REFERENCE_CUTOUT = 0x22
