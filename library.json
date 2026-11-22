@@ -1,6 +1,6 @@
 {
   "name": "CFC_CAN_Discovery_Protocol",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "description": "Shared CFC discovery, DCC stream, LaBox reference and booster supervision protocols",
   "keywords": ["can", "discovery", "dcc", "cfc"],
   "frameworks": ["arduino"],

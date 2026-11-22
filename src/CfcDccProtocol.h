@@ -52,7 +52,8 @@ enum class ServiceCommand : uint8_t {
     BOOSTER_TIMING_SET = 0xBA,
     BOOSTER_DETECTED = 0xBB,
     BOOSTER_ASSOCIATION_VALIDATION = 0xC4,
-    BOOSTER_DISCOVERY_MODE = 0xC5
+    BOOSTER_DISCOVERY_MODE = 0xC5,
+    BOOSTER_TIMING_READ = 0xC6
 };
 
 static constexpr uint8_t SERVICE_DLC = 8;
@@ -145,6 +146,14 @@ enum class TimingResult : uint8_t {
     TRANSACTION_CONFLICT = 6
 };
 
+// BOOSTER_TIMING_READ (0xC6), CAN Service 29-bit, DLC 8.
+// Request (resp=0), ERM source ID 1:
+// [0] format version; [1..2] transaction uint16 LE; [3] target booster ID;
+// [4..7] reserved, zero. Response (resp=1), CC source, same target in nodeId:
+// [0] format version; [1..2] transaction; [3] TimingResult (APPLIED means the
+// read succeeded); [4..5] saved signed half-bit corrections in µs;
+// [6..7] reserved, zero. This is read-only and may be requested while DCC runs.
+
 enum class BoosterAssociationResult : uint8_t {
     VALID = 0,
     ID_MISMATCH = 1,
@@ -197,7 +206,8 @@ enum class UartType : uint8_t {
     DCC_TIMING_RESULT = 0x14,
     BOOSTER_DISCOVERY_MODE = 0x15,
     BOOSTER_ASSOCIATION_VALIDATE = 0x16,
-    CLEAR_CANTON_ID = 0x17
+    CLEAR_CANTON_ID = 0x17,
+    DCC_TIMING_READ = 0x18
 };
 
 // UART BOOSTER_DISCOVERY_MODE (0x15), payload DLC 1: [0] 1=permit / 0=inhibit.
@@ -226,6 +236,9 @@ enum class UartType : uint8_t {
 // [0..1] transaction ID; [2] TimingResult; [3] saved half-bit-1 correction;
 // [4] saved half-bit-0 correction. UART transport ACK and application result
 // are distinct: ACK confirms frame reception; RESULT confirms applied/saved.
+// UART DCC_TIMING_READ (0x18), payload DLC 2: [0..1] transaction uint16 LE.
+// The Booster answers with DCC_TIMING_RESULT (0x14), reporting its stored
+// corrections without changing them; the ordinary UART ACK confirms receipt.
 
 } // namespace dcc
 } // namespace cfc

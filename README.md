@@ -6,15 +6,17 @@ Bibliothèque commune des protocoles CAN CFC : découverte générale 11 bits en
 
 ## État
 
-Version `0.5.0` : conserve la découverte générale CAN 11 bits v1 et les
-messages DCC publiés en `0.4.0`, puis ajoute la découverte/association Booster.
-Les nouveaux messages sont CAN Booster `0x101` en Exploration, CAN Service
-`0xBB`, `0xC4`, `0xC5`, CAN Commands `0xD3`, `0xED`, `0xEE`, `0xEF` et UART
-`0x15`–`0x17`. Cette version n’est pas compatible avec l’ancien usage cutout
-de CAN Booster `0x101`; Booster et convertisseur doivent être mis à jour
-ensemble, DCC arrêté. Les nouveaux échanges sont publiés mais restent à
-intégrer aux firmwares. La valeur réelle du cutout `0xB8` demeure invalide
-jusqu’à sa mesure à la sortie HUB LaBox.
+Version `0.6.0` : ajoute la commande CAN Service `0xC6` pour relire les
+corrections demi-bit sauvegardées dans un Booster et le type UART `0x18`
+correspondant. La lecture est sans effet sur le réglage.
+
+Version `0.5.0` : ajoute la découverte/association Booster, avec CAN Booster
+`0x101`, CAN Service `0xBB`/`0xC4`/`0xC5`, CAN Commands `0xD3`/`0xED`–`0xEF`
+et UART `0x15`–`0x17`. Le CAN Booster `0x101` n’est plus le cutout historique;
+Booster et convertisseur doivent être mis à jour ensemble, DCC arrêté. Les
+relais et traitements correspondants sont intégrés et compilent; le bus réel
+reste à vérifier. La durée réelle du cutout `0xB8` demeure invalide jusqu’à
+sa mesure à la sortie HUB LaBox.
 
 ## Utilisation PlatformIO
 
@@ -22,7 +24,7 @@ Dans `platformio.ini`, épingler une version Git explicite, par exemple :
 
 ```ini
 lib_deps =
-https://github.com/prune74/CFC_CAN_Discovery_Protocol.git#v0.5.0
+https://github.com/prune74/CFC_CAN_Discovery_Protocol.git#v0.6.0
 ```
 
 Ne pas utiliser une branche flottante pour les firmwares destinés à être déployés.
@@ -32,7 +34,9 @@ Ne pas utiliser une branche flottante pour les firmwares destinés à être dép
 `src/CfcDiscoveryProtocol.h` fournit les valeurs communes de découverte,
 opcodes, temporisations, validation des CAN ID d’arbitrage et CRC-8 du repérage
 D→H. `src/CfcDccProtocol.h` fixe les commandes DCC, identifiants, drapeaux,
-causes et dispositions des charges utiles CAN Booster, CAN Service et UART.
+causes et dispositions des charges utiles CAN Booster et CAN Service. Le format
+des trames UART et les types communs sont dans
+`Gestion_Canton_Protocol/src/UartProtocol.h`.
 
 ## Documentation et exemples
 
