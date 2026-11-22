@@ -2,16 +2,19 @@
 
 > Suivi détaillé du projet CFC : dossier `Suivi/ERM_Liaison_DCC` dans l’espace de travail du projet.
 
-Bibliothèque commune des protocoles CAN CFC : découverte 11 bits entre ERM (S), HUB (H), DISTRIB (D), convertisseurs (C) et LaBox (L), plus les contrats logiques DCC/Cutout et les messages de référence/supervision 29 bits. Les boosters (B) ne participent pas comme nœuds de découverte; ils reçoivent le flux DCC sur le CAN Booster et leurs diagnostics par UART puis CAN Service.
+Bibliothèque commune des protocoles CAN CFC : découverte générale 11 bits entre ERM réseau CC (S), HUB (H), DISTRIB (D), convertisseurs (C) et LaBox (L), plus les contrats logiques DCC/cutout. L’ERM Liaison DCC gouverne séparément l’association booster-convertisseur : le booster annonce son ID par CAN Booster `0x101` en Exploration, le convertisseur le signale sur CAN Service 29 bits, puis CC et EXCC relaient la validation.
 
 ## État
 
-Version de travail `0.4.0`. Elle conserve la découverte CAN 11 bits v1 et
-formalise les messages du projet DCC : flux CAN Booster `0x100`, supervision et
-références CAN Service 29 bits `0xB6`–`0xBA`, et types UART `0x06`, `0x12`–`0x14`.
-Ces contrats sont publiés dans la bibliothèque; l’intégration coordonnée aux
-firmwares et les validations sur matériel restent à effectuer. La valeur réelle
-du cutout `0xB8` demeure invalide jusqu’à sa mesure à la sortie HUB LaBox.
+Version `0.5.0` : conserve la découverte générale CAN 11 bits v1 et les
+messages DCC publiés en `0.4.0`, puis ajoute la découverte/association Booster.
+Les nouveaux messages sont CAN Booster `0x101` en Exploration, CAN Service
+`0xBB`, `0xC4`, `0xC5`, CAN Commands `0xD3`, `0xED`, `0xEE`, `0xEF` et UART
+`0x15`–`0x17`. Cette version n’est pas compatible avec l’ancien usage cutout
+de CAN Booster `0x101`; Booster et convertisseur doivent être mis à jour
+ensemble, DCC arrêté. Les nouveaux échanges sont publiés mais restent à
+intégrer aux firmwares. La valeur réelle du cutout `0xB8` demeure invalide
+jusqu’à sa mesure à la sortie HUB LaBox.
 
 ## Utilisation PlatformIO
 
@@ -19,7 +22,7 @@ Dans `platformio.ini`, épingler une version Git explicite, par exemple :
 
 ```ini
 lib_deps =
-https://github.com/prune74/CFC_CAN_Discovery_Protocol.git#v0.4.0
+https://github.com/prune74/CFC_CAN_Discovery_Protocol.git#v0.5.0
 ```
 
 Ne pas utiliser une branche flottante pour les firmwares destinés à être déployés.
@@ -38,9 +41,9 @@ causes et dispositions des charges utiles CAN Booster, CAN Service et UART.
   et décodage des IDs.
 - `examples/ReferenceFrames/` : trames de référence pour le CAN analyseur.
 
-Dans la cible DCC, le CAN Booster standard 11 bits transporte uniquement le
-flux DCC et les événements cutout sous `0x100`. Les anciens IDs locaux
-`0x101`–`0x104` et les anciennes références LaBox standard 11 bits `0x701` /
-`0x20`–`0x22` ne font pas partie de la cible; ils restent dans les firmwares
-actuels jusqu’à leur migration. Le CAN Service 29 bits transporte références,
-supervision, défauts et réglages.
+Dans la cible DCC, le CAN Booster standard 11 bits transporte le flux DCC et
+les événements cutout sous `0x100`. L’ID `0x101` est réservé à l’annonce
+booster en Exploration et ne transporte jamais le flux DCC. Les anciens
+formats `0x102`–`0x104` et les anciennes références LaBox standard 11 bits
+`0x701` / `0x20`–`0x22` sont supprimés de la cible. Le CAN Service 29 bits
+transporte références, supervision, défauts, réglages et association booster.

@@ -10,8 +10,12 @@ namespace dcc {
 
 static constexpr uint8_t PROTOCOL_VERSION = 1;
 
-// CAN Booster : CAN standard 11 bits, flux DCC/cutout seulement.
+// CAN Booster : CAN standard 11 bits. 0x100 transporte le flux DCC/cutout;
+// 0x101 sert uniquement à annoncer l'ID Booster en Exploration autorisée.
 static constexpr uint16_t CAN_BOOSTER_STREAM_ID = 0x100;
+static constexpr uint16_t CAN_BOOSTER_DISCOVERY_ID = 0x101;
+static constexpr uint8_t BOOSTER_DISCOVERY_FORMAT_VERSION = 1;
+static constexpr uint8_t BOOSTER_DISCOVERY_DLC = 8;
 static constexpr uint8_t STREAM_MAGIC = 0xD2;
 static constexpr uint8_t STREAM_DLC_DCC_1_TO_8_BITS = 5;
 static constexpr uint8_t STREAM_DLC_DCC_9_TO_16_BITS = 6;
@@ -45,7 +49,10 @@ enum class ServiceCommand : uint8_t {
     LABOX_DCC_PROFILE = 0xB7,
     LABOX_CUTOUT_REFERENCE = 0xB8,
     CONVERTER_DCC_FAULT = 0xB9,
-    BOOSTER_TIMING_SET = 0xBA
+    BOOSTER_TIMING_SET = 0xBA,
+    BOOSTER_DETECTED = 0xBB,
+    BOOSTER_ASSOCIATION_VALIDATION = 0xC4,
+    BOOSTER_DISCOVERY_MODE = 0xC5
 };
 
 static constexpr uint8_t SERVICE_DLC = 8;
@@ -54,6 +61,12 @@ static constexpr uint16_t REFERENCE_STALE_MS = 1500;
 static constexpr uint16_t SUPERVISION_PERIOD_MS = 1000;
 static constexpr uint16_t SUPERVISION_STALE_MS = 3000;
 static constexpr uint16_t CONVERTER_FAULT_REPEAT_MS = 1000;
+static constexpr uint16_t BOOSTER_ANNOUNCE_PERIOD_MS = 100;
+static constexpr uint16_t BOOSTER_DETECTION_REPEAT_MS = 1000;
+static constexpr uint16_t BOOSTER_DISCOVERY_MODE_PERIOD_MS = 500;
+static constexpr uint16_t BOOSTER_DISCOVERY_MODE_TTL_MS = 1500;
+static constexpr uint16_t BOOSTER_ASSOCIATION_RETRY_MS = 500;
+static constexpr uint16_t BOOSTER_ASSOCIATION_UART_TIMEOUT_MS = 1500;
 
 enum class BoosterState : uint8_t {
     OK = 0,
@@ -132,14 +145,71 @@ enum class TimingResult : uint8_t {
     TRANSACTION_CONFLICT = 6
 };
 
+enum class BoosterAssociationResult : uint8_t {
+    VALID = 0,
+    ID_MISMATCH = 1,
+    UNAVAILABLE = 2,
+    BOOSTER_REFUSED = 3
+};
+
+// Mapping for the existing UART ACK status when acknowledging UART 0x16:
+// 0 (ACK_OK)->VALID; 1 (ACK_INVALID)->ID_MISMATCH; 2 (ACK_NO_HEARTBEAT) or
+// no ACK before timeout -> UNAVAILABLE; 3 (ACK_NO_ID)->BOOSTER_REFUSED.
+
+// CAN Booster 0x101, standard 11-bit, DLC 8, response to fresh Exploration
+// permit only:
+// [0] format version (=1); [1] saved canton/booster ID (1..252);
+// [2..7] reserved zero. Booster emits every 100 ms only while it has a valid
+// runtime ID and a fresh Exploration permit. A changed ID clears the local
+// association latch and restarts announcements; same-ID refresh is idempotent.
+// It stops after association is validated. CAN DCC/cutout data remains 0x100.
+
+// BOOSTER_DETECTED (0xBB), CAN Service 29-bit, DLC 8, converter source ID:
+// [0] format version (=1); [1] booster ID (1..252); [2..7] reserved zero;
+// resp=0. Converter repeats every second until it hears a successful 0xC4
+// response from the CC for this booster ID.
+
+// BOOSTER_ASSOCIATION_VALIDATION (0xC4), CAN Service 29-bit, DLC 8.
+// Request (resp=0), ERM Liaison DCC source ID 1:
+// [0] format version (=1); [1..2] transaction uint16 LE;
+// [3] target booster/canton ID; [4] zero; [5..7] reserved zero.
+// Only the CC whose canton ID matches [3] handles the broadcast; other CCs
+// ignore it without replying. That CC relays the unchanged payload to EXCC
+// (CAN Command 0xEE), then to the booster (UART 0x16). Response (resp=1),
+// CC source:
+// [0..3] copied; [4] BoosterAssociationResult; [5..7] reserved zero. This
+// response is visible to the converter on CAN Service, which then stops 0xBB.
+// Results: 0 accepted, 1 ID mismatch, 2 EXCC/booster unavailable or UART
+// timeout (1500 ms), 3 booster refused. ERM retries every 500 ms with the same
+// transaction until a result; CC/EXCC deduplicate pending requests.
+
+// BOOSTER_DISCOVERY_MODE (0xC5), CAN Service 29-bit, DLC 8, ERM source ID 1:
+// [0] format version (=1); [1] 1=permit / 0=inhibit; [2..7] reserved zero.
+// Repeat every 500 ms. A permit expires after 1500 ms without refresh.
+// CC relays it as CAN Command 0xEF and EXCC sends UART 0x15 to its booster.
+
 // Types within the existing UART frame (frame v2, CRC-16, transport sequence
 // and ACK type 0x04 remain unchanged).
 enum class UartType : uint8_t {
     DCC_REFERENCE = 0x06,
     DCC_DIAGNOSTIC = 0x12,
     DCC_TIMING_SET = 0x13,
-    DCC_TIMING_RESULT = 0x14
+    DCC_TIMING_RESULT = 0x14,
+    BOOSTER_DISCOVERY_MODE = 0x15,
+    BOOSTER_ASSOCIATION_VALIDATE = 0x16,
+    CLEAR_CANTON_ID = 0x17
 };
+
+// UART BOOSTER_DISCOVERY_MODE (0x15), payload DLC 1: [0] 1=permit / 0=inhibit.
+// Permit expires after 1500 ms without refresh; inhibition is immediate.
+// UART BOOSTER_ASSOCIATION_VALIDATE (0x16), payload DLC 8: unchanged Service
+// 0xC4 request payload. Existing UART ACK 0x04, correlated by command and
+// sequence, carries the acceptance status; EXCC translates it to CAN Command
+// result 0xD3 through CC. No extra UART result frame is introduced.
+// UART CLEAR_CANTON_ID (0x17), payload DLC 0: explicit request to erase the
+// persisted booster ID and stop DCC. Ordinary SET_CANTON_ID with 0xFF is not
+// an erase request: it marks the runtime ID unassigned and inhibits DCC while
+// preserving the persisted ID. All three commands require a UART ACK.
 
 // UART DCC_DIAGNOSTIC (0x12), payload DLC 8:
 // [0] canton ID; [1] BoosterDccCause; [2] 1 active / 0 cleared;
