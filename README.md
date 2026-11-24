@@ -14,7 +14,7 @@ invalide. Émission chaque seconde;
 la donnée devient périmée après 3 secondes sans mise à jour valide. Cette
 télémétrie ne transite pas sur CAN Booster.
 
-## Version candidate 0.9.0 — préparée localement, non publiée
+## Version 0.9.0 — publiée (`2fc43f8`)
 
 Cette révision prépare la répartition des identifiants source du CAN Service
 29 bits : CC `1..250`, nouvelle carte éventuelle `251`, CLF `252`,
@@ -39,7 +39,7 @@ appliquer le réglage. Une nouvelle transaction remplace l’entrée; un
 redémarrage l’efface. L’ERM attend la fin ou l’expiration avant d’en lancer
 une autre.
 
-Cette candidate n’est pas publiée et aucun firmware n’est adapté à ces
+Cette version est publiée, mais les firmwares ne sont pas encore adaptés à ces
 changements.
 
 Version `0.7.0` : ajoute `BOOSTER_RAIL_VOLTAGE (0xC7)` sur CAN Service. La

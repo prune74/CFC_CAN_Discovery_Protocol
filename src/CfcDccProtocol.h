@@ -167,8 +167,8 @@ enum class ConverterFaultCause : uint8_t {
 // BOOSTER_TIMING_SET (0xBA), DLC 8. Request (resp=0), source ERM Liaison CFC
 // ID 253:
 // [0] format version; [1..2] transaction ID uint16 LE;
-// [3] target canton/booster ID (1..250 in the next protocol revision; current
-// published firmware still accepts 1..252);
+// [3] target canton/booster ID (protocol v0.9.0: 1..250; current firmware
+// still accepts 1..252 until it is migrated);
 // [4] signed half-bit-1 correction µs;
 // [5] signed half-bit-0 correction µs; [6..7] reserved, zero.
 // Each correction must be -5..+5. Response (resp=1) uses same opcode:
@@ -208,9 +208,8 @@ enum class TimingResult : uint8_t {
 // [2..3] MP1584 5 V output, [4..5] XL4015 output, [6..7] PROG track voltage
 // after DRV8874. A reading of 0xFFFF means that measurement is invalid or
 // unavailable. LaBox emits every 1000 ms; the ERM marks the telemetry stale
-// after 3000 ms without a new valid frame. 0xC9 is reserved for the profile /
-// setpoint command; the next local draft defines its request and response.
-// That draft is not yet published. CAN Booster carries no copy of telemetry.
+// after 3000 ms without a new valid frame. 0xC9 is the published profile /
+// setpoint command; CAN Booster carries no copy of telemetry.
 
 // LABOX_PROFILE_SETPOINT (0xC9), CAN Service 29-bit, DLC 8. Request (resp=0),
 // source ERM_Liaison_CFC ID 253:
@@ -280,8 +279,8 @@ enum class BoosterAssociationResult : uint8_t {
 
 // CAN Booster 0x101, standard 11-bit, DLC 8, response to fresh Exploration
 // permit only:
-// [0] format version (=1); [1] saved canton/booster ID (1..250 in the next
-// protocol revision; current firmware still accepts 1..252);
+// [0] format version (=1); [1] saved canton/booster ID (protocol v0.9.0:
+// 1..250; current firmware still accepts 1..252 until it is migrated);
 // [2..7] reserved zero. Booster emits every 100 ms only while it has a valid
 // runtime ID and a fresh Exploration permit. A changed ID clears the local
 // association latch and restarts announcements; same-ID refresh is idempotent.
@@ -289,8 +288,8 @@ enum class BoosterAssociationResult : uint8_t {
 
 // BOOSTER_DETECTED (0xBB), CAN Service 29-bit, DLC 8, converter source ID
 // 0x0100 + its discovery ID (C/11..C/88 maps to 0x010B..0x0158):
-// [0] format version (=1); [1] booster ID (1..250 in the next protocol
-// revision; current firmware still accepts 1..252); [2..7] reserved zero;
+// [0] format version (=1); [1] booster ID (protocol v0.9.0: 1..250; current
+// firmware still accepts 1..252 until it is migrated); [2..7] reserved zero;
 // resp=0. Converter repeats every second until it hears a successful 0xC4
 // response from the CC for this booster ID.
 
