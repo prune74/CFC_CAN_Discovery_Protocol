@@ -53,14 +53,20 @@ enum class ServiceCommand : uint8_t {
     BOOSTER_DETECTED = 0xBB,
     BOOSTER_ASSOCIATION_VALIDATION = 0xC4,
     BOOSTER_DISCOVERY_MODE = 0xC5,
-    BOOSTER_TIMING_READ = 0xC6
+    BOOSTER_TIMING_READ = 0xC6,
+    BOOSTER_RAIL_VOLTAGE = 0xC7
 };
 
 static constexpr uint8_t SERVICE_DLC = 8;
+static constexpr uint8_t BOOSTER_RAIL_VOLTAGE_DLC = 8;
+static constexpr uint8_t BOOSTER_RAIL_VOLTAGE_VALID = 1;
+static constexpr uint8_t BOOSTER_RAIL_VOLTAGE_INVALID = 0;
 static constexpr uint16_t REFERENCE_PERIOD_MS = 500;
 static constexpr uint16_t REFERENCE_STALE_MS = 1500;
 static constexpr uint16_t SUPERVISION_PERIOD_MS = 1000;
 static constexpr uint16_t SUPERVISION_STALE_MS = 3000;
+static constexpr uint16_t BOOSTER_RAIL_VOLTAGE_PERIOD_MS = 1000;
+static constexpr uint16_t BOOSTER_RAIL_VOLTAGE_STALE_MS = 3000;
 static constexpr uint16_t CONVERTER_FAULT_REPEAT_MS = 1000;
 static constexpr uint16_t BOOSTER_ANNOUNCE_PERIOD_MS = 100;
 static constexpr uint16_t BOOSTER_DETECTION_REPEAT_MS = 1000;
@@ -153,6 +159,14 @@ enum class TimingResult : uint8_t {
 // [0] format version; [1..2] transaction; [3] TimingResult (APPLIED means the
 // read succeeded); [4..5] saved signed half-bit corrections in µs;
 // [6..7] reserved, zero. This is read-only and may be requested while DCC runs.
+
+// BOOSTER_RAIL_VOLTAGE (0xC7), CAN Service 29-bit, DLC 8, CC -> ERM Liaison
+// DCC. The CC source/node ID identifies the reporting canton; the Booster ID
+// is known from its CC/EXCC association. Payload: [0..1] measured rail voltage
+// in millivolts, uint16 LE; [2] validity (1 valid, 0 invalid); [3..7] reserved,
+// zero. The useful three measurement bytes are copied unchanged from CAN
+// Commands BOOSTER_RAIL_VOLTAGE (0xDD). The CC emits every 1000 ms; the ERM
+// marks this measurement stale after 3000 ms without a valid update.
 
 enum class BoosterAssociationResult : uint8_t {
     VALID = 0,

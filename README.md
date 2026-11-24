@@ -1,10 +1,17 @@
 # CFC CAN Discovery Protocol
 
-> Suivi détaillé du projet CFC : dossier `Suivi/ERM_Liaison_DCC` dans l’espace de travail du projet.
+> Suivi détaillé du projet CFC : dossiers `Suivi/Protocoles/CAN_CFC` et `Suivi/Chantiers/Distribution_DCC` dans l’espace de travail du projet.
 
 Bibliothèque commune des protocoles CAN CFC : découverte générale 11 bits entre ERM réseau CC (S), HUB (H), DISTRIB (D), convertisseurs (C) et LaBox (L), plus les contrats logiques DCC/cutout. L’ERM Liaison DCC gouverne séparément l’association booster-convertisseur : le booster annonce son ID par CAN Booster `0x101` en Exploration, le convertisseur le signale sur CAN Service 29 bits, puis CC et EXCC relaient la validation.
 
 ## État
+
+Version `0.7.0` : ajoute `BOOSTER_RAIL_VOLTAGE (0xC7)` sur CAN Service. La
+mesure arrive du Booster par UART `0x19`, puis est relayée sans changement via
+CAN Commands `0xDD`. Les deux trames CAN font 8 octets : tension des rails en
+mV (uint16 little-endian), validité (`1` valide, `0` invalide), puis cinq
+octets réservés à zéro. La mesure est transmise chaque seconde et devient
+périmée après 3 secondes sans nouvelle valeur valide.
 
 Version `0.6.0` : ajoute la commande CAN Service `0xC6` pour relire les
 corrections demi-bit sauvegardées dans un Booster et le type UART `0x18`
@@ -24,7 +31,7 @@ Dans `platformio.ini`, épingler une version Git explicite, par exemple :
 
 ```ini
 lib_deps =
-https://github.com/prune74/CFC_CAN_Discovery_Protocol.git#v0.6.0
+https://github.com/prune74/CFC_CAN_Discovery_Protocol.git#v0.7.0
 ```
 
 Ne pas utiliser une branche flottante pour les firmwares destinés à être déployés.
@@ -40,7 +47,7 @@ des trames UART et les types communs sont dans
 
 ## Documentation et exemples
 
-- Spécification détaillée et état d’avancement : `Suivi/ERM_Liaison_DCC/PROTOCOLE_CAN_DECOUVERTE_SPECIFICATION.md` dans l’espace de travail du projet.
+- Spécification détaillée et état d’avancement : `Suivi/Protocoles/CAN_CFC/PROTOCOLE_CAN_DECOUVERTE_SPECIFICATION.md` dans l’espace de travail du projet.
 - `examples/BasicProtocol/BasicProtocol.cpp` : exemple minimal de génération
   et décodage des IDs.
 - `examples/ReferenceFrames/` : trames de référence pour le CAN analyseur.
