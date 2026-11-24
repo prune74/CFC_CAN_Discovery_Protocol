@@ -54,13 +54,18 @@ enum class ServiceCommand : uint8_t {
     BOOSTER_ASSOCIATION_VALIDATION = 0xC4,
     BOOSTER_DISCOVERY_MODE = 0xC5,
     BOOSTER_TIMING_READ = 0xC6,
-    BOOSTER_RAIL_VOLTAGE = 0xC7
+    BOOSTER_RAIL_VOLTAGE = 0xC7,
+    LABOX_VOLTAGE_TELEMETRY = 0xC8
 };
 
 static constexpr uint8_t SERVICE_DLC = 8;
 static constexpr uint8_t BOOSTER_RAIL_VOLTAGE_DLC = 8;
 static constexpr uint8_t BOOSTER_RAIL_VOLTAGE_VALID = 1;
 static constexpr uint8_t BOOSTER_RAIL_VOLTAGE_INVALID = 0;
+static constexpr uint8_t LABOX_VOLTAGE_TELEMETRY_DLC = 8;
+static constexpr uint16_t LABOX_VOLTAGE_TELEMETRY_PERIOD_MS = 1000;
+static constexpr uint16_t LABOX_VOLTAGE_TELEMETRY_STALE_MS = 3000;
+static constexpr uint16_t VOLTAGE_MEASUREMENT_INVALID_MV = 0xFFFF;
 static constexpr uint16_t REFERENCE_PERIOD_MS = 500;
 static constexpr uint16_t REFERENCE_STALE_MS = 1500;
 static constexpr uint16_t SUPERVISION_PERIOD_MS = 1000;
@@ -167,6 +172,14 @@ enum class TimingResult : uint8_t {
 // zero. The useful three measurement bytes are copied unchanged from CAN
 // Commands BOOSTER_RAIL_VOLTAGE (0xDD). The CC emits every 1000 ms; the ERM
 // marks this measurement stale after 3000 ms without a valid update.
+
+// LABOX_VOLTAGE_TELEMETRY (0xC8), CAN Service 29-bit, DLC 8, LaBox source ID
+// 1. Four uint16 LE readings in millivolts: [0..1] general supply,
+// [2..3] MP1584 5 V output, [4..5] XL4015 output, [6..7] PROG track voltage
+// after DRV8874. A reading of 0xFFFF means that measurement is invalid or
+// unavailable. LaBox emits every 1000 ms; the ERM marks the telemetry stale
+// after 3000 ms without a new valid frame. 0xC9 remains the profile/setpoint
+// command; CAN Booster carries no copy of this telemetry.
 
 enum class BoosterAssociationResult : uint8_t {
     VALID = 0,

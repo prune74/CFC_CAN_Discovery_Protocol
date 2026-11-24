@@ -6,6 +6,14 @@ Bibliothèque commune des protocoles CAN CFC : découverte générale 11 bits en
 
 ## État
 
+Version `0.8.0` : ajoute `LABOX_VOLTAGE_TELEMETRY (0xC8)` sur CAN Service.
+LaBox (source 1) transmet en mV, sur quatre uint16 little-endian, l’alimentation
+générale, la sortie 5 V MP1584, la sortie XL4015 et la tension des rails PROG
+après DRV8874. `0xFFFF` signale une mesure invalide. Émission chaque seconde;
+la donnée devient périmée après 3 secondes sans mise à jour valide. `0xC9`
+reste réservé à la commande du profil et de la consigne. Cette télémétrie ne
+transite pas sur CAN Booster.
+
 Version `0.7.0` : ajoute `BOOSTER_RAIL_VOLTAGE (0xC7)` sur CAN Service. La
 mesure arrive du Booster par UART `0x19`, puis est relayée sans changement via
 CAN Commands `0xDD`. Les deux trames CAN font 8 octets : tension des rails en
@@ -31,7 +39,7 @@ Dans `platformio.ini`, épingler une version Git explicite, par exemple :
 
 ```ini
 lib_deps =
-https://github.com/prune74/CFC_CAN_Discovery_Protocol.git#v0.7.0
+https://github.com/prune74/CFC_CAN_Discovery_Protocol.git#v0.8.0
 ```
 
 Ne pas utiliser une branche flottante pour les firmwares destinés à être déployés.
