@@ -6,8 +6,12 @@ Bibliothèque commune des protocoles CAN CFC : découverte générale 11 bits en
 
 ## État
 
-Version publiée `0.8.0` : ajoute `LABOX_VOLTAGE_TELEMETRY (0xC8)` sur CAN Service.
-Dans la version publiée v0.8.0, LaBox (source 1) transmet en mV, sur quatre
+Version actuelle publiée `0.9.0` (`2fc43f8`) : définit les sources CAN
+Service 29 bits et la commande profil/consigne `0xC9`, avec ses relais et
+réponses. Les firmwares doivent encore migrer vers cette version.
+
+La version publiée antérieure `0.8.0` a ajouté `LABOX_VOLTAGE_TELEMETRY
+(0xC8)` sur CAN Service. Dans cette version, LaBox (source 1) transmet en mV, sur quatre
 uint16 little-endian, l’alimentation générale, la sortie 5 V MP1584, la sortie
 XL4015 et la tension des rails PROG après DRV8874. `0xFFFF` signale une mesure
 invalide. Émission chaque seconde;
@@ -16,7 +20,7 @@ télémétrie ne transite pas sur CAN Booster.
 
 ## Version 0.9.0 — publiée (`2fc43f8`)
 
-Cette révision prépare la répartition des identifiants source du CAN Service
+Cette révision définit la répartition des identifiants source du CAN Service
 29 bits : CC `1..250`, nouvelle carte éventuelle `251`, CLF `252`,
 `ERM_Liaison_CFC` `253`, LaBox `254`, `255` réservé, convertisseurs
 `0x0100 + leur ID de découverte C/x`. Les identités de découverte 11 bits
@@ -67,7 +71,7 @@ Dans `platformio.ini`, épingler une version Git explicite, par exemple :
 
 ```ini
 lib_deps =
-https://github.com/prune74/CFC_CAN_Discovery_Protocol.git#v0.8.0
+https://github.com/prune74/CFC_CAN_Discovery_Protocol.git#v0.9.0
 ```
 
 Ne pas utiliser une branche flottante pour les firmwares destinés à être déployés.
