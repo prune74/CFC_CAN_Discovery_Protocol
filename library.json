@@ -1,6 +1,6 @@
 {
   "name": "CFC_CAN_Discovery_Protocol",
-  "version": "0.8.0",
+  "version": "0.9.0",
   "description": "Shared CFC discovery, DCC stream, references, booster supervision and rail-voltage protocols",
   "keywords": ["can", "discovery", "dcc", "cfc"],
   "frameworks": ["arduino"],

@@ -2,17 +2,45 @@
 
 > Suivi détaillé du projet CFC : dossiers `Suivi/Protocoles/CAN_CFC` et `Suivi/Chantiers/Distribution_DCC` dans l’espace de travail du projet.
 
-Bibliothèque commune des protocoles CAN CFC : découverte générale 11 bits entre ERM réseau CC (S), HUB (H), DISTRIB (D), convertisseurs (C) et LaBox (L), plus les contrats logiques DCC/cutout. L’ERM Liaison DCC gouverne séparément l’association booster-convertisseur : le booster annonce son ID par CAN Booster `0x101` en Exploration, le convertisseur le signale sur CAN Service 29 bits, puis CC et EXCC relaient la validation.
+Bibliothèque commune des protocoles CAN CFC : découverte générale 11 bits entre ERM réseau CC (S), HUB (H), DISTRIB (D), convertisseurs (C) et LaBox (L), plus les contrats logiques DCC/cutout. La carte `ERM_Liaison_CFC` gouverne séparément l’association booster-convertisseur : le booster annonce son ID par CAN Booster `0x101` en Exploration, le convertisseur le signale sur CAN Service 29 bits, puis CC et EXCC relaient la validation.
 
 ## État
 
-Version `0.8.0` : ajoute `LABOX_VOLTAGE_TELEMETRY (0xC8)` sur CAN Service.
-LaBox (source 1) transmet en mV, sur quatre uint16 little-endian, l’alimentation
-générale, la sortie 5 V MP1584, la sortie XL4015 et la tension des rails PROG
-après DRV8874. `0xFFFF` signale une mesure invalide. Émission chaque seconde;
-la donnée devient périmée après 3 secondes sans mise à jour valide. `0xC9`
-reste réservé à la commande du profil et de la consigne. Cette télémétrie ne
-transite pas sur CAN Booster.
+Version publiée `0.8.0` : ajoute `LABOX_VOLTAGE_TELEMETRY (0xC8)` sur CAN Service.
+Dans la version publiée v0.8.0, LaBox (source 1) transmet en mV, sur quatre
+uint16 little-endian, l’alimentation générale, la sortie 5 V MP1584, la sortie
+XL4015 et la tension des rails PROG après DRV8874. `0xFFFF` signale une mesure
+invalide. Émission chaque seconde;
+la donnée devient périmée après 3 secondes sans mise à jour valide. Cette
+télémétrie ne transite pas sur CAN Booster.
+
+## Version candidate 0.9.0 — préparée localement, non publiée
+
+Cette révision prépare la répartition des identifiants source du CAN Service
+29 bits : CC `1..250`, nouvelle carte éventuelle `251`, CLF `252`,
+`ERM_Liaison_CFC` `253`, LaBox `254`, `255` réservé, convertisseurs
+`0x0100 + leur ID de découverte C/x`. Les identités de découverte 11 bits
+restent inchangées.
+
+Elle ajoute la commande profil/consigne `0xC9` et sa réponse avec le même
+opcode, `resp=1`, résultat `0..7`. Le traitement du résultat
+`2=destinataire invalide` est défensif : l’ERM rejette un destinataire inconnu
+avant émission et les cartes ne répondent pas à un sélecteur invalide.
+
+Le trajet CC/EXCC/Booster utilise CAN Commands `0xE6`/`0xDE` et UART
+`0x1A`/`0x1B`. Les résultats UART `0..5` deviennent les résultats CAN
+`0,1,3,4,6,7`; le délai EXCC est une nouvelle tentative après 500 ms et le
+résultat CAN `5=Booster non confirmé` après 1 000 ms sans réponse applicative.
+
+Chaque destinataire garde en mémoire volatile la dernière transaction, sa
+demande exacte et son résultat. Une répétition identique renvoie le résultat
+mémorisé; le même numéro avec un contenu différent renvoie CAN `7` sans
+appliquer le réglage. Une nouvelle transaction remplace l’entrée; un
+redémarrage l’efface. L’ERM attend la fin ou l’expiration avant d’en lancer
+une autre.
+
+Cette candidate n’est pas publiée et aucun firmware n’est adapté à ces
+changements.
 
 Version `0.7.0` : ajoute `BOOSTER_RAIL_VOLTAGE (0xC7)` sur CAN Service. La
 mesure arrive du Booster par UART `0x19`, puis est relayée sans changement via
