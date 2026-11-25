@@ -8,7 +8,10 @@ Bibliothèque commune des protocoles CAN CFC : découverte générale 11 bits en
 
 Version actuelle publiée `0.9.0` (`2fc43f8`) : définit les sources CAN
 Service 29 bits et la commande profil/consigne `0xC9`, avec ses relais et
-réponses. Les firmwares doivent encore migrer vers cette version.
+réponses. Les firmwares concernés sont migrés et compilent. Le trajet de mesure
+Booster `0x19` → `0xDD` → `0xC7` est intégré jusqu’à l’affichage ERM, où la
+mesure est comparée à la dernière consigne confirmée. LaBox émet `0xC8`; sa
+réception et l’affichage des quatre mesures sont également intégrés dans l’ERM.
 
 La version publiée antérieure `0.8.0` a ajouté `LABOX_VOLTAGE_TELEMETRY
 (0xC8)` sur CAN Service. Dans cette version, LaBox (source 1) transmet en mV, sur quatre
@@ -43,8 +46,8 @@ appliquer le réglage. Une nouvelle transaction remplace l’entrée; un
 redémarrage l’efface. L’ERM attend la fin ou l’expiration avant d’en lancer
 une autre.
 
-Cette version est publiée, mais les firmwares ne sont pas encore adaptés à ces
-changements.
+Ces commandes sont intégrées et compilent dans les firmwares concernés. Les
+échanges sur bus réel restent à vérifier.
 
 Version `0.7.0` : ajoute `BOOSTER_RAIL_VOLTAGE (0xC7)` sur CAN Service. La
 mesure arrive du Booster par UART `0x19`, puis est relayée sans changement via
